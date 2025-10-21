@@ -1,0 +1,9 @@
+@echo off
+echo 🤖 Starting Telegram Book Library Bot...
+echo.
+echo 📋 Installing dependencies...
+pip install -r requirements.txt
+echo.
+echo 🚀 Starting bot...
+python bot.py
+pause
