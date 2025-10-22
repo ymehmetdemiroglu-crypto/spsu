@@ -126,7 +126,19 @@ async def show_categories(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for category in file_bot.files_db.keys():
         emoji = category_emojis.get(category, "📚")
         book_count = len(file_bot.files_db[category])
-        keyboard.append([InlineKeyboardButton(f"{emoji} {category} ({book_count})", callback_data=f"category_{category}")])
+        # Use simple callback data to avoid encoding issues
+        if category == "الكتب العربية":
+            callback_data = "cat_arabic"
+        elif category == "English Books":
+            callback_data = "cat_english"
+        elif category == "Turkish Books":
+            callback_data = "cat_turkish"
+        elif category == "ملفات التدريب والامتحانات":
+            callback_data = "cat_training"
+        else:
+            callback_data = f"cat_{category}"
+        
+        keyboard.append([InlineKeyboardButton(f"{emoji} {category} ({book_count})", callback_data=callback_data)])
     
     # Add back button
     keyboard.append([InlineKeyboardButton("⬅️ العودة للقائمة الرئيسية", callback_data="main_menu")])
@@ -153,10 +165,11 @@ async def show_books_in_category(update: Update, context: ContextTypes.DEFAULT_T
     keyboard = []
     
     # Add book buttons (limit to 8 books per page to avoid Telegram limits)
-    for book in books[:8]:
+    for i, book in enumerate(books[:8]):
         # Truncate long titles
         display_title = book['title'][:35] + "..." if len(book['title']) > 35 else book['title']
-        keyboard.append([InlineKeyboardButton(f"📖 {display_title}", callback_data=f"book_{book['title']}_{category}")])
+        # Use index-based callback data to avoid encoding issues
+        keyboard.append([InlineKeyboardButton(f"📖 {display_title}", callback_data=f"book_{i}_{category}")])
     
     # Add navigation buttons
     keyboard.append([InlineKeyboardButton("⬅️ العودة للفئات", callback_data="view_books")])
@@ -356,17 +369,31 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data == "help":
         await show_help(update, context)
     
-    elif data.startswith("category_"):
-        category = data.replace("category_", "")
+    elif data.startswith("cat_"):
+        # Map callback data to actual category names
+        if data == "cat_arabic":
+            category = "الكتب العربية"
+        elif data == "cat_english":
+            category = "English Books"
+        elif data == "cat_turkish":
+            category = "Turkish Books"
+        elif data == "cat_training":
+            category = "ملفات التدريب والامتحانات"
+        else:
+            category = data.replace("cat_", "")
         await show_books_in_category(update, context, category)
     
     elif data.startswith("book_"):
-        # Extract book title and category from callback data
+        # Extract book index and category from callback data
         parts = data.replace("book_", "").split("_", 1)
         if len(parts) >= 2:
-            book_title = parts[0]
+            book_index = int(parts[0])
             category = parts[1]
-            await send_book_link(update, context, book_title, category)
+            # Get the book from the category using the index
+            books = file_bot.files_db.get(category, [])
+            if book_index < len(books):
+                book_title = books[book_index]['title']
+                await send_book_link(update, context, book_title, category)
 
 async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Log errors"""
