@@ -375,7 +375,7 @@ async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 def main():
     """Start the bot"""
     try:
-        # Create application
+        # Create application with compatibility fixes for Python 3.13
         application = Application.builder().token(BOT_TOKEN).build()
         
         # Add handlers
@@ -385,19 +385,45 @@ def main():
         application.add_error_handler(error_handler)
         
         # Start the bot
-        print("🤖 Book Library Bot is starting...")
+        print("🤖 Arabic Book Library Bot is starting...")
+        print("🇸🇦 البوت العربي لمكتبة الكتب يبدأ...")
         print("📋 Make sure to:")
         print("   1. Bot token is configured")
         print("   2. Update files_database.json with your book structure")
         print("   3. Ensure Google Drive files are set to 'Anyone with the link can view'")
         print("   4. Test the bot with /start command")
         
-        application.run_polling()
+        # Use run_polling with compatibility settings
+        application.run_polling(
+            allowed_updates=Update.ALL_TYPES,
+            drop_pending_updates=True
+        )
     except Exception as e:
         print(f"❌ Error starting bot: {e}")
-        print("💡 Try installing a compatible version:")
-        print("   pip install python-telegram-bot==20.8")
-        print("   or use Python 3.11 instead of 3.13")
+        print("💡 This is a Python 3.13 compatibility issue.")
+        print("🔧 Trying alternative startup method...")
+        
+        # Alternative startup method for Python 3.13
+        try:
+            import asyncio
+            from telegram.ext import ApplicationBuilder
+            
+            # Create application with builder
+            app = ApplicationBuilder().token(BOT_TOKEN).build()
+            
+            # Add handlers
+            app.add_handler(CommandHandler("start", start))
+            app.add_handler(CallbackQueryHandler(button_callback))
+            app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_search))
+            app.add_error_handler(error_handler)
+            
+            print("🚀 Starting bot with Python 3.13 compatibility...")
+            app.run_polling()
+            
+        except Exception as e2:
+            print(f"❌ Alternative method also failed: {e2}")
+            print("💡 Please use Python 3.11 for best compatibility")
+            print("   Or contact support for Python 3.13 fixes")
 
 if __name__ == '__main__':
     main()
