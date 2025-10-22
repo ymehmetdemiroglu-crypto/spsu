@@ -7,3 +7,4 @@ echo.
 echo 🚀 Starting bot...
 python bot.py
 pause
+
