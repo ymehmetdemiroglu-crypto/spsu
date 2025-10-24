@@ -2,6 +2,7 @@ import os
 import json
 import logging
 import re
+import time
 from typing import Dict, List, Optional
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
@@ -16,15 +17,60 @@ logger = logging.getLogger(__name__)
 # Bot configuration
 BOT_TOKEN = "8459047761:AAEv-RrhZQnngpD1iO47pwgB2_t7wnqLhrE"
 
+# Precompile regex used for extracting Google Drive file IDs
+FILE_ID_RE = re.compile(r'/file/d/([a-zA-Z0-9-_]+)')
+
+# List of 21 Arabic book titles to poll
+ARABIC_BOOK_TITLES: List[str] = [
+    "الأسماء التجارية والعلمية للأدوية",
+    "مبادئ علم الأدوية",
+    "أساسيات الصيدلة السريرية",
+    "كيمياء دوائية متقدمة",
+    "مقدمة في علم الأمراض",
+    "علم التشريح الوصفي",
+    "أساسيات علم الأحياء الدقيقة",
+    "علم المناعة التطبيقي",
+    "الكيمياء الحيوية الطبية",
+    "فيزيولوجيا الإنسان",
+    "علم الأمراض السريري",
+    "الممارسة الصيدلانية",
+    "مهارات التواصل الصحي",
+    "الإسعافات الأولية",
+    "التحاليل الطبية",
+    "تقنيات المختبر",
+    "سلامة الأدوية والتداخلات",
+    "دراسات الحالة السريرية",
+    "علم العقاقير",
+    "التغذية العلاجية",
+    "الصحة العامة والوبائيات",
+]
+
+def chunk_list(items: List[str], chunk_size: int) -> List[List[str]]:
+    return [items[i:i + chunk_size] for i in range(0, len(items), chunk_size)]
+
+async def poll_books(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Send 21 titles split into 3 polls (7 each)."""
+    sections = chunk_list(ARABIC_BOOK_TITLES, 7)
+    total = len(sections)
+    for idx, options in enumerate(sections, start=1):
+        question = f"📚 اختر كتابك المفضل (القسم {idx} من {total})"
+        if update.message:
+            await update.message.reply_poll(question=question, options=options)
+        else:
+            chat_id = update.effective_chat.id
+            await context.bot.send_poll(chat_id=chat_id, question=question, options=options)
+
 class FileBot:
     def __init__(self):
         self.files_db = self.load_files_database()
+        self.search_index = self.build_search_index()
         
     def load_files_database(self) -> Dict:
         """Load the files database from JSON file"""
         try:
             with open('files_database.json', 'r', encoding='utf-8') as f:
-                return json.load(f)
+                data = json.load(f)
+                return data
         except FileNotFoundError:
             # Create default database structure
             default_db = {
@@ -40,8 +86,17 @@ class FileBot:
     
     def save_files_database(self, database: Dict):
         """Save the files database to JSON file"""
-        with open('files_database.json', 'w', encoding='utf-8') as f:
-            json.dump(database, f, ensure_ascii=False, indent=2)
+        # Avoid unnecessary disk writes by only writing when content changes
+        try:
+            with open('files_database.json', 'r', encoding='utf-8') as f:
+                current = f.read()
+        except FileNotFoundError:
+            current = None
+
+        new_json = json.dumps(database, ensure_ascii=False, indent=2)
+        if current != new_json:
+            with open('files_database.json', 'w', encoding='utf-8') as f:
+                f.write(new_json)
     
     def get_all_books(self) -> List[Dict]:
         """Get all books from all categories"""
@@ -53,24 +108,39 @@ class FileBot:
                 all_books.append(book_with_category)
         return all_books
     
+    def build_search_index(self) -> List[Dict]:
+        """Build a simple lowercase search index for fast lookups"""
+        indexed_books: List[Dict] = []
+        for category, books in self.files_db.items():
+            for book in books:
+                indexed_books.append({
+                    'title': book['title'],
+                    'lower_title': book['title'].lower(),
+                    'link': book['link'],
+                    'category': category,
+                })
+        return indexed_books
+
     def search_books(self, query: str) -> List[Dict]:
         """Search for books containing the query"""
         query = query.lower()
-        matching_books = []
-        
-        for category, books in self.files_db.items():
-            for book in books:
-                if query in book['title'].lower():
-                    book_with_category = book.copy()
-                    book_with_category['category'] = category
-                    matching_books.append(book_with_category)
-        
+        if not query:
+            return []
+        matching_books: List[Dict] = [
+            {
+                'title': item['title'],
+                'link': item['link'],
+                'category': item['category'],
+            }
+            for item in self.search_index
+            if query in item['lower_title']
+        ]
         return matching_books[:10]  # Limit to 10 results
     
     def get_direct_download_link(self, google_drive_link: str) -> str:
         """Convert Google Drive sharing link to direct download link"""
         # Extract file ID from Google Drive link
-        file_id_match = re.search(r'/file/d/([a-zA-Z0-9-_]+)', google_drive_link)
+        file_id_match = FILE_ID_RE.search(google_drive_link)
         if file_id_match:
             file_id = file_id_match.group(1)
             # Convert to direct download link
@@ -402,14 +472,18 @@ async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 def main():
     """Start the bot"""
     try:
+        t0 = time.perf_counter()
         # Create application with compatibility fixes for Python 3.13
         application = Application.builder().token(BOT_TOKEN).build()
+        t1 = time.perf_counter()
         
         # Add handlers
         application.add_handler(CommandHandler("start", start))
+        application.add_handler(CommandHandler("poll_books", poll_books))
         application.add_handler(CallbackQueryHandler(button_callback))
         application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_search))
         application.add_error_handler(error_handler)
+        t2 = time.perf_counter()
         
         # Start the bot
         print("🤖 Arabic Book Library Bot is starting...")
@@ -419,11 +493,12 @@ def main():
         print("   2. Update files_database.json with your book structure")
         print("   3. Ensure Google Drive files are set to 'Anyone with the link can view'")
         print("   4. Test the bot with /start command")
+        print(f"⏱️ Init timings: build={t1 - t0:.3f}s, handlers={t2 - t1:.3f}s")
         
         # Use run_polling with compatibility settings
         application.run_polling(
-            allowed_updates=Update.ALL_TYPES,
-            drop_pending_updates=True
+            allowed_updates=["message", "callback_query"],
+            drop_pending_updates=True,
         )
     except Exception as e:
         print(f"❌ Error starting bot: {e}")
@@ -445,7 +520,10 @@ def main():
             app.add_error_handler(error_handler)
             
             print("🚀 Starting bot with Python 3.13 compatibility...")
-            app.run_polling()
+            app.run_polling(
+                allowed_updates=["message", "callback_query"],
+                drop_pending_updates=True,
+            )
             
         except Exception as e2:
             print(f"❌ Alternative method also failed: {e2}")

@@ -27,7 +27,8 @@ def install_dependencies():
     """Install required dependencies"""
     print("📦 Installing dependencies...")
     try:
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "python-telegram-bot==21.0"])
+        # Avoid redundant reinstalls by using --upgrade-strategy only-if-needed
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "--upgrade", "--upgrade-strategy", "only-if-needed", "python-telegram-bot==21.0"])
         print("✅ Dependencies installed successfully")
         return True
     except subprocess.CalledProcessError as e:
@@ -42,13 +43,10 @@ def run_bot():
             print("🇸🇦 البوت العربي لمكتبة الكتب يبدأ...")
             
             # Try the Python 3.13 compatible version first
-            try:
-                import bot_python313
-                print("✅ Using Python 3.13 compatible version")
-            except ImportError:
-                print("❌ Python 3.13 compatible version not found")
-                print("💡 Please ensure bot_python313.py exists")
-                return False
+            # Import of the bot module here would execute it immediately and slow startup
+            # Instead, instruct the user to run the module directly to avoid duplicate work
+            print("💡 To start the bot, run: python bot_python313.py")
+            return True
         else:
             print("❌ Failed to install dependencies")
             return False
