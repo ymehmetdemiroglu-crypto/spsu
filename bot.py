@@ -29,7 +29,8 @@ class FileBot:
         """Load the files database from JSON file"""
         try:
             with open('files_database.json', 'r', encoding='utf-8') as f:
-                return json.load(f)
+                data = json.load(f)
+                return data
         except FileNotFoundError:
             # Create default database structure
             default_db = {
@@ -45,8 +46,17 @@ class FileBot:
     
     def save_files_database(self, database: Dict):
         """Save the files database to JSON file"""
-        with open('files_database.json', 'w', encoding='utf-8') as f:
-            json.dump(database, f, ensure_ascii=False, indent=2)
+        # Avoid unnecessary disk writes by only writing when content changes
+        try:
+            with open('files_database.json', 'r', encoding='utf-8') as f:
+                current = f.read()
+        except FileNotFoundError:
+            current = None
+
+        new_json = json.dumps(database, ensure_ascii=False, indent=2)
+        if current != new_json:
+            with open('files_database.json', 'w', encoding='utf-8') as f:
+                f.write(new_json)
     
     def get_all_books(self) -> List[Dict]:
         """Get all books from all categories"""
