@@ -21,6 +21,46 @@ BOT_TOKEN = "8459047761:AAEv-RrhZQnngpD1iO47pwgB2_t7wnqLhrE"
 # Precompile regex used for extracting Google Drive file IDs
 FILE_ID_RE = re.compile(r'/file/d/([a-zA-Z0-9-_]+)')
 
+# List of 21 Arabic book titles to poll
+ARABIC_BOOK_TITLES: List[str] = [
+    "الأسماء التجارية والعلمية للأدوية",
+    "مبادئ علم الأدوية",
+    "أساسيات الصيدلة السريرية",
+    "كيمياء دوائية متقدمة",
+    "مقدمة في علم الأمراض",
+    "علم التشريح الوصفي",
+    "أساسيات علم الأحياء الدقيقة",
+    "علم المناعة التطبيقي",
+    "الكيمياء الحيوية الطبية",
+    "فيزيولوجيا الإنسان",
+    "علم الأمراض السريري",
+    "الممارسة الصيدلانية",
+    "مهارات التواصل الصحي",
+    "الإسعافات الأولية",
+    "التحاليل الطبية",
+    "تقنيات المختبر",
+    "سلامة الأدوية والتداخلات",
+    "دراسات الحالة السريرية",
+    "علم العقاقير",
+    "التغذية العلاجية",
+    "الصحة العامة والوبائيات",
+]
+
+def chunk_list(items: List[str], chunk_size: int) -> List[List[str]]:
+    return [items[i:i + chunk_size] for i in range(0, len(items), chunk_size)]
+
+async def poll_books(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Send 21 titles split into 3 polls (7 each)."""
+    sections = chunk_list(ARABIC_BOOK_TITLES, 7)
+    total = len(sections)
+    for idx, options in enumerate(sections, start=1):
+        question = f"📚 اختر كتابك المفضل (القسم {idx} من {total})"
+        if update.message:
+            await update.message.reply_poll(question=question, options=options)
+        else:
+            chat_id = update.effective_chat.id
+            await context.bot.send_poll(chat_id=chat_id, question=question, options=options)
+
 class FileBot:
     def __init__(self):
         self.files_db = self.load_files_database()
@@ -412,6 +452,7 @@ async def main():
         
         # Add handlers
         application.add_handler(CommandHandler("start", start))
+        application.add_handler(CommandHandler("poll_books", poll_books))
         application.add_handler(CallbackQueryHandler(button_callback))
         application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_search))
         application.add_error_handler(error_handler)
