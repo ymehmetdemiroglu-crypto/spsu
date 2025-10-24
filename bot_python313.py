@@ -182,8 +182,8 @@ async def show_categories(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode='Markdown'
     )
 
-async def show_books_in_category(update: Update, context: ContextTypes.DEFAULT_TYPE, category: str):
-    """Show books in a specific category"""
+async def show_books_in_category(update: Update, context: ContextTypes.DEFAULT_TYPE, category: str, page: int = 0):
+    """Show books in a specific category with pagination for Arabic books"""
     books = file_bot.files_db.get(category, [])
     
     if not books:
@@ -195,12 +195,44 @@ async def show_books_in_category(update: Update, context: ContextTypes.DEFAULT_T
     
     keyboard = []
     
-    # Add book buttons (limit to 8 books per page to avoid Telegram limits)
-    for i, book in enumerate(books[:8]):
-        # Truncate long titles
-        display_title = book['title'][:35] + "..." if len(book['title']) > 35 else book['title']
-        # Use index-based callback data to avoid encoding issues
-        keyboard.append([InlineKeyboardButton(f"📖 {display_title}", callback_data=f"book_{i}_{category}")])
+    # Special handling for Arabic books - split into 3 equal sections
+    if category == "الكتب العربية":
+        books_per_page = len(books) // 3
+        if len(books) % 3 != 0:
+            books_per_page += 1
+        
+        start_idx = page * books_per_page
+        end_idx = min(start_idx + books_per_page, len(books))
+        current_books = books[start_idx:end_idx]
+        total_pages = 3
+        
+        # Add book buttons for current page
+        for i, book in enumerate(current_books):
+            # Truncate long titles
+            display_title = book['title'][:35] + "..." if len(book['title']) > 35 else book['title']
+            # Use index-based callback data to avoid encoding issues
+            keyboard.append([InlineKeyboardButton(f"📖 {display_title}", callback_data=f"book_{start_idx + i}_{category}")])
+        
+        # Add pagination navigation for Arabic books
+        if total_pages > 1:
+            nav_buttons = []
+            if page > 0:
+                nav_buttons.append(InlineKeyboardButton("⬅️ السابق", callback_data=f"page_{category}_{page-1}"))
+            if page < total_pages - 1:
+                nav_buttons.append(InlineKeyboardButton("التالي ➡️", callback_data=f"page_{category}_{page+1}"))
+            if nav_buttons:
+                keyboard.append(nav_buttons)
+            
+            # Add page indicator
+            keyboard.append([InlineKeyboardButton(f"📄 صفحة {page + 1} من {total_pages}", callback_data="noop")])
+    else:
+        # For other categories, use the original 8 books limit
+        current_books = books[:8]
+        for i, book in enumerate(current_books):
+            # Truncate long titles
+            display_title = book['title'][:35] + "..." if len(book['title']) > 35 else book['title']
+            # Use index-based callback data to avoid encoding issues
+            keyboard.append([InlineKeyboardButton(f"📖 {display_title}", callback_data=f"book_{i}_{category}")])
     
     # Add navigation buttons
     keyboard.append([InlineKeyboardButton("⬅️ العودة للفئات", callback_data="view_books")])
@@ -208,8 +240,9 @@ async def show_books_in_category(update: Update, context: ContextTypes.DEFAULT_T
     
     reply_markup = InlineKeyboardMarkup(keyboard)
     
+    page_info = f" (صفحة {page + 1} من 3)" if category == "الكتب العربية" and page > 0 else ""
     await update.callback_query.edit_message_text(
-        f"📂 **{category}**\n\nاختر كتاباً للحصول على رابط التحميل:",
+        f"📂 **{category}**{page_info}\n\nاختر كتاباً للحصول على رابط التحميل:",
         reply_markup=reply_markup,
         parse_mode='Markdown'
     )
@@ -427,6 +460,17 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             category = data.replace("cat_", "")
         await show_books_in_category(update, context, category)
     
+    elif data.startswith("page_"):
+        # Handle page navigation for Arabic books
+        parts = data.replace("page_", "").split("_")
+        if len(parts) >= 2:
+            category = parts[0]
+            page = int(parts[1])
+            # Map category back to actual name
+            if category == "arabic":
+                category = "الكتب العربية"
+            await show_books_in_category(update, context, category, page)
+    
     elif data.startswith("searchbook_"):
         # Handle search result book selection
         book_index = int(data.replace("searchbook_", ""))
@@ -450,6 +494,10 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             except ValueError:
                 # Invalid index, ignore
                 await query.answer("❌ خطأ في تحديد الكتاب", show_alert=True)
+    
+    elif data == "noop":
+        # Handle no-op button (page indicator)
+        await query.answer()
 
 async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Log errors"""
