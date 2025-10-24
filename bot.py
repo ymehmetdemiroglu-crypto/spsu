@@ -277,10 +277,19 @@ async def send_book_link(update: Update, context: ContextTypes.DEFAULT_TYPE, boo
     direct_link = file_bot.get_direct_download_link(book['link'])
     
     # Create keyboard with both original and direct download links
+    # Map category name to callback data
+    category_callback_map = {
+        "الكتب العربية": "cat_arabic",
+        "English Books": "cat_english",
+        "Turkish Books": "cat_turkish",
+        "ملفات التدريب والامتحانات": "cat_training"
+    }
+    category_callback = category_callback_map.get(category, f"cat_{category}")
+    
     keyboard = [
         [InlineKeyboardButton("🔗 فتح في Google Drive", url=book['link'])],
         [InlineKeyboardButton("⬇️ تحميل مباشر", url=direct_link)],
-        [InlineKeyboardButton("⬅️ العودة للفئة", callback_data=f"category_{category}")],
+        [InlineKeyboardButton("⬅️ العودة للفئة", callback_data=category_callback)],
         [InlineKeyboardButton("🏠 القائمة الرئيسية", callback_data="main_menu")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -351,12 +360,16 @@ async def handle_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # Create keyboard with search results
     keyboard = []
-    for book in results[:8]:  # Limit to 8 results
+    for i, book in enumerate(results[:8]):  # Limit to 8 results
         display_title = book['title'][:30] + "..." if len(book['title']) > 30 else book['title']
-        keyboard.append([InlineKeyboardButton(f"📖 {display_title}", callback_data=f"book_{book['title']}_{book['category']}")])
+        # Use index-based callback to match the handler
+        keyboard.append([InlineKeyboardButton(f"📖 {display_title}", callback_data=f"searchbook_{i}")])
     
     keyboard.append([InlineKeyboardButton("🔎 بحث جديد", callback_data="search_books")])
     keyboard.append([InlineKeyboardButton("🏠 القائمة الرئيسية", callback_data="main_menu")])
+    
+    # Store search results in context for later retrieval
+    context.user_data['last_search_results'] = results[:8]
     
     reply_markup = InlineKeyboardMarkup(keyboard)
     
@@ -453,17 +466,29 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             category = data.replace("cat_", "")
         await show_books_in_category(update, context, category)
     
+    elif data.startswith("searchbook_"):
+        # Handle search result book selection
+        book_index = int(data.replace("searchbook_", ""))
+        search_results = context.user_data.get('last_search_results', [])
+        if book_index < len(search_results):
+            book = search_results[book_index]
+            await send_book_link(update, context, book['title'], book['category'])
+    
     elif data.startswith("book_"):
         # Extract book index and category from callback data
         parts = data.replace("book_", "").split("_", 1)
         if len(parts) >= 2:
-            book_index = int(parts[0])
-            category = parts[1]
-            # Get the book from the category using the index
-            books = file_bot.files_db.get(category, [])
-            if book_index < len(books):
-                book_title = books[book_index]['title']
-                await send_book_link(update, context, book_title, category)
+            try:
+                book_index = int(parts[0])
+                category = parts[1]
+                # Get the book from the category using the index
+                books = file_bot.files_db.get(category, [])
+                if book_index < len(books):
+                    book_title = books[book_index]['title']
+                    await send_book_link(update, context, book_title, category)
+            except ValueError:
+                # Invalid index, ignore
+                await query.answer("❌ خطأ في تحديد الكتاب", show_alert=True)
 
 async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Log errors"""
