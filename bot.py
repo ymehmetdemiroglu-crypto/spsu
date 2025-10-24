@@ -159,6 +159,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
         [InlineKeyboardButton("📂 تصفح الكتب", callback_data="view_books")],
         [InlineKeyboardButton("🔎 البحث في الكتب", callback_data="search_books")],
+        [InlineKeyboardButton("📊 استطلاع الكتب المفضلة", callback_data="poll_books")],
         [InlineKeyboardButton("❓ المساعدة", callback_data="help")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -170,6 +171,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 📂 **تصفح الكتب** - تصفح الكتب حسب الفئة
 🔎 **البحث في الكتب** - البحث عن كتب محددة
+📊 **استطلاع الكتب المفضلة** - صوّت على كتابك المفضل
 ❓ **المساعدة** - تعلم كيفية استخدام البوت
 
 استخدم /start في أي وقت للعودة إلى القائمة الرئيسية.
@@ -433,6 +435,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         keyboard = [
             [InlineKeyboardButton("📂 تصفح الكتب", callback_data="view_books")],
             [InlineKeyboardButton("🔎 البحث في الكتب", callback_data="search_books")],
+            [InlineKeyboardButton("📊 استطلاع الكتب المفضلة", callback_data="poll_books")],
             [InlineKeyboardButton("❓ المساعدة", callback_data="help")]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
@@ -451,6 +454,9 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     elif data == "help":
         await show_help(update, context)
+    
+    elif data == "poll_books":
+        await poll_books(update, context)
     
     elif data.startswith("cat_"):
         # Map callback data to actual category names
