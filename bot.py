@@ -318,14 +318,14 @@ async def show_search_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     search_message = """
 🔎 **البحث في الكتب**
 
-اكتب كلمة مفتاحية للبحث عن الكتب. سيجد البوت الكتب التي تحتوي على مصطلح البحث.
+اكتب اسم الكتاب أو كلمة مفتاحية دقيقة ليعثر البوت على العناوين المطابقة. استخدم لغة الكتاب الذي تبحث عنه.
 
-**أمثلة:**
-• `أدوية` - يجد كتب الأدوية
-• `طب` - يجد كتب الطب
-• `صيدلة` - يجد كتب الصيدلة
+**أمثلة على أسماء كتب:**
+• English: `biochemistry`, `pharmaceutics`, `organic chemistry`
+• Türkçe: `farmakoloji`, `anatomi`, `analitik`
+• العربية: `أدوية`, `فيتامينات`, `سموميات`
 
-اكتب مصطلح البحث الآن:
+اكتب اسم الكتاب الآن:
     """
     
     await update.callback_query.edit_message_text(
