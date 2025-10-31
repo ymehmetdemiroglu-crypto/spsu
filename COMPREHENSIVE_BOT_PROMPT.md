@@ -120,7 +120,10 @@ async def button_callback(update, context):
 #### **Search Flow**
 1. User clicks "🔎 Search Books"
 2. Bot prompts for search term
-3. User types keyword (e.g., "biochemistry")
+3. User types the specific book name or keyword in the appropriate language, such as:
+   - English: "biochemistry", "pharmaceutics", "organic chemistry"
+   - Turkish: "farmakoloji", "anatomi", "analitik"
+   - Arabic: "أدوية", "فيتامينات", "سموميات"
 4. Bot shows matching books with category info
 5. User clicks desired book
 6. Bot provides download options
